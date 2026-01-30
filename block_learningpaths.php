@@ -50,7 +50,7 @@ class block_learningpaths extends block_base {
         }
 
         $data = [
-            'items' => array_values($pathdata)
+            'paths' => array_values($pathdata)
         ];
 
         $this->content->text = $OUTPUT->render_from_template('block_learningpaths/main_view', $data);
