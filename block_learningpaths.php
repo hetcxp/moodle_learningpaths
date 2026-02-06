@@ -18,9 +18,6 @@ class block_learningpaths extends block_base {
     public function get_content() {
         global $USER, $OUTPUT;
 
-        // DEBUGGING: Remove this in production
-        error_log('DEBUG: block_learningpaths::get_content called for user ' . $USER->id);
-
         if ($this->content !== null) {
             return $this->content;
         }
@@ -29,23 +26,33 @@ class block_learningpaths extends block_base {
         $this->content->text = '';
         $this->content->footer = '';
 
-        // Temporary removal of login check for debugging visibility
-        // if (!isloggedin() || isguestuser()) {
-        //     return $this->content;
-        // }
+        if (!isloggedin() || isguestuser()) {
+            return $this->content;
+        }
 
         try {
             $pathdata = self::get_user_path_data($USER->id);
-            error_log('DEBUG: Path data count: ' . count($pathdata));
+            
+            // Integración con local_adminpanel para cursos asignados por organización
+            if (class_exists('\local_adminpanel\data\adminpanel_data')) {
+                $data_manager = new \local_adminpanel\data\adminpanel_data();
+                if (method_exists($data_manager, 'get_user_organization_path_details')) {
+                    $org_details = $data_manager->get_user_organization_path_details($USER->id);
+                    if (!empty($org_details['steps'])) {
+                        $virtual_path = $org_details['path'];
+                        $virtual_path['steps'] = $org_details['steps'];
+                        $pathdata[] = $virtual_path;
+                    }
+                }
+            }
+            
         } catch (\Exception $e) {
-            error_log('DEBUG: Exception in get_user_path_data: ' . $e->getMessage());
             $this->content->text = 'Error loading path: ' . $e->getMessage();
             return $this->content;
         }
 
         if (empty($pathdata)) {
             $this->content->text = get_string('no_path', 'block_learningpaths');
-            error_log('DEBUG: No path data found, setting text to: ' . $this->content->text);
             return $this->content;
         }
 
@@ -54,7 +61,6 @@ class block_learningpaths extends block_base {
         ];
 
         $this->content->text = $OUTPUT->render_from_template('block_learningpaths/main_view', $data);
-        error_log('DEBUG: Rendered content length: ' . strlen($this->content->text));
 
         return $this->content;
     }

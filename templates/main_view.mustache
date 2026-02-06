@@ -23,9 +23,18 @@
                                     <i class="fa fa-play-circle text-primary" aria-hidden="true"></i>
                                 {{/is_locked}}{{/is_completed}}
                             </div>
-                             <h6 class="m-0 font-weight-bold {{#is_current}}text-primary{{/is_current}} {{^is_current}}text-body{{/is_current}}" style="font-size: 0.95rem; line-height: 1.2;">
-                                {{fullname}}
-                            </h6>
+                            <div class="overflow-hidden w-100">
+                                <h6 class="m-0 font-weight-bold {{#is_current}}text-primary{{/is_current}} {{^is_current}}text-body{{/is_current}}" style="font-size: 0.95rem; line-height: 1.2;">
+                                    {{fullname}}
+                                </h6>
+                                {{#organization_name}}
+                                    <div class="mt-1 text-truncate">
+                                        <span class="badge badge-light border font-weight-normal text-muted">
+                                            <i class="fa fa-sitemap mr-1" aria-hidden="true"></i> {{organization_name}}
+                                        </span>
+                                    </div>
+                                {{/organization_name}}
+                            </div>
                         </div>
                         
                         <div class="text-right">
