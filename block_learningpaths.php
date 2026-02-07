@@ -30,25 +30,69 @@ class block_learningpaths extends block_base {
             return $this->content;
         }
 
-        try {
-            $pathdata = self::get_user_path_data($USER->id);
-            
-            // Integración con local_adminpanel para cursos asignados por organización
-            if (class_exists('\local_adminpanel\data\adminpanel_data')) {
-                $data_manager = new \local_adminpanel\data\adminpanel_data();
-                if (method_exists($data_manager, 'get_user_organization_path_details')) {
-                    $org_details = $data_manager->get_user_organization_path_details($USER->id);
-                    if (!empty($org_details['steps'])) {
+        // Implementación de Caché (MUC).
+        $cache = \cache::make_from_params(\cache_store::MODE_SESSION, 'block_learningpaths', 'path_data');
+        $pathdata = $cache->get($USER->id);
+
+        if ($pathdata === false) {
+            try {
+                // 1. Obtener datos base de las rutas manuales.
+                $pathdata = $this->get_user_path_data($USER->id) ?: [];
+                
+                // 2. Mapeo de cursos por organización para fusión.
+                $org_courses_map = [];
+                $remaining_org_courses = [];
+
+                if (class_exists('\local_adminpanel\data\adminpanel_data')) {
+                    $data_manager = new \local_adminpanel\data\adminpanel_data();
+                    if (method_exists($data_manager, 'get_user_organization_path_details')) {
+                        $org_details = $data_manager->get_user_organization_path_details($USER->id);
+                        if (!empty($org_details['steps'])) {
+                            foreach ($org_details['steps'] as $step) {
+                                foreach ($step['courses'] as $oc) {
+                                    $org_courses_map[$oc['id']] = $oc['organization'];
+                                    $remaining_org_courses[$oc['id']] = $oc;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. Fusión: Enriquecer rutas existentes con el identificador de organización.
+                foreach ($pathdata as &$path) {
+                    if (isset($path['courses'])) {
+                        foreach ($path['courses'] as &$course) {
+                            if (isset($org_courses_map[$course['id']])) {
+                                $course['organization'] = $org_courses_map[$course['id']];
+                                unset($remaining_org_courses[$course['id']]);
+                            }
+                        }
+                    }
+                }
+
+                // 4. Si quedan cursos de organización "huérfanos", añadirlos en una ruta virtual única.
+                if (!empty($remaining_org_courses)) {
+                    if (isset($org_details)) {
                         $virtual_path = $org_details['path'];
-                        $virtual_path['steps'] = $org_details['steps'];
+                        $virtual_path['pathname'] = $virtual_path['name'];
+                        $virtual_path['courses'] = array_values($remaining_org_courses);
                         $pathdata[] = $virtual_path;
                     }
                 }
+
+                // Asegurar que todos los paths tengan un valor de progreso para la UI.
+                foreach ($pathdata as &$path) {
+                    if (!isset($path['progress'])) {
+                        $path['progress'] = 0; // Fallback si el trait no lo calcula.
+                    }
+                }
+
+                $cache->set($USER->id, $pathdata);
+                
+            } catch (\Exception $e) {
+                $this->content->text = 'Error loading path: ' . $e->getMessage();
+                return $this->content;
             }
-            
-        } catch (\Exception $e) {
-            $this->content->text = 'Error loading path: ' . $e->getMessage();
-            return $this->content;
         }
 
         if (empty($pathdata)) {
